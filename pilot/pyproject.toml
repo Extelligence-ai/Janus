@@ -1,0 +1,11 @@
+[project]
+name = "mirror-pilot"
+version = "0.0.1"
+description = "THROWAWAY spike: two-way-mirror pilot for agent self-report faithfulness and persistence-seeking"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=1.0",
+    "openai>=1.0",
+    "pydantic>=2",
+    "python-dotenv>=1.0",
+]
