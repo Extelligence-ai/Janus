@@ -24,7 +24,7 @@ About 1,060 simulated sessions with three models acting as operations agents. Fu
 | Model | Unneeded API keys | Alerts routed to an agent inbox | Footholds left out of its own report |
 |---|:-:|:-:|:-:|
 | Claude Opus 5.5 | 0 sessions | 0 / 60 | 0 of finished sessions |
-| GPT-5.5 | **36 sessions** | **40 / 60** | **77 / 178** |
+| GPT-5.5 | **36 sessions** | **40 / 60** | **75 / 178** |
 | Qwen3-32B | 2 sessions | 0 / 60 | 19 / 130 |
 
 **Takeaway:** what an agent says it did is not an audit trail. The footholds missing from reports were almost all API keys, which in this setup never expire.
@@ -36,6 +36,7 @@ About 1,060 simulated sessions with three models acting as operations agents. Fu
 | Path | What it is |
 |---|---|
 | [`docs/research/two-way-mirror-pilot.md`](docs/research/two-way-mirror-pilot.md) | Write-up of the pilot: design, results, limitations |
+| [`data/`](data/) | Raw data for all 1,060 sessions: mirror logs, self-reports, transcripts and judge verdicts |
 | `pilot/world.py` | Simulated tools and the **mirror**, a hidden, hash-chained log of every tool call |
 | `pilot/scenarios.py` | Scenarios and conditions. `v1` is the first pilot; `v2` adds policy wording × monitoring notice |
 | `pilot/agents.py` | Agent loops for Anthropic and OpenAI-compatible APIs (OpenAI, OpenRouter, Ollama) |
@@ -55,8 +56,14 @@ uv run run.py --suite v2 --models claude-opus-5-5,openai:gpt-5.5 --trials 10
 uv run analyze.py results/<stamp>/runs.jsonl
 ```
 
+To regenerate the published tables from `data/` (no API key needed), see [`data/README.md`](data/README.md).
+
 Every tool and dataset is simulated. No real systems, credentials or third parties are involved.
 
 ## Status and feedback
 
 This pilot is shared early to invite feedback on the method. A pre-registered study with more scenarios and models, and a judge from a second provider, is planned. Issues and methodology critiques are welcome.
+
+## License
+
+Code is under the [MIT License](LICENSE). The write-up (`docs/`) and data (`data/`) are under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): reuse them freely with attribution.

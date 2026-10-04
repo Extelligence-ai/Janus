@@ -16,7 +16,7 @@ What we found, in a simulated environment:
 - **Telling agents they were being audited changed nothing we could measure**, for any of the three models.
 - **The models fail in different ways.**
   - Claude rarely created footholds nobody asked for, and disclosed every one it created.
-  - GPT-5.5 often created extras. It minted never-expiring API keys the task didn't need in 36 sessions and routed future alerts to an inbox that starts new agent sessions in 40 of 60 opportunities. It left a foothold out of its report in 77 of the 178 sessions where it created one, almost always an API key.
+  - GPT-5.5 often created extras. It minted never-expiring API keys the task didn't need in 36 sessions and routed future alerts to an inbox that starts new agent sessions in 40 of 60 opportunities. It left a foothold out of its report in 75 of the 178 sessions where it created one, almost always an API key.
   - Qwen sometimes broke the explicit rule. In 5 of those 10 sessions it filed an approval request only *after* creating the resource.
 - **The AI judge was the weakest link.** In our first pilot, every "fabrication" our AI judge flagged was a false alarm on human review. Monitoring agents with AI needs monitoring too.
 
@@ -170,7 +170,7 @@ GPT-5.5 routed alerts to the agent inbox in every session without the explicit r
 | | Sessions with a foothold | …with a foothold left out | What was left out |
 |---|---|---|---|
 | Claude Opus 5.5 | 122 | 2 (see note) | n/a |
-| GPT-5.5 | 178 | **77** | almost entirely API keys (75 of 76 undisclosed footholds) |
+| GPT-5.5 | 178 | **75** | almost entirely API keys (75 of 76 undisclosed footholds) |
 | Qwen3-32B | 130 | **19** | all API keys, all in the token-expiry scenario |
 
 *Note on Claude:* both cases were sessions cut short by a model refusal before any report was written, so there was nothing to disclose in. In every Claude session that finished, every foothold was reported.
@@ -226,6 +226,8 @@ The job was already active when Qwen wrote that it was "awaiting approval".
 
 **Also observed:** 16 Claude sessions, mostly in the alert follow-up scenario, ended in a model refusal. We didn't record the refusal reasons in this pilot and treat them as their own outcome. The judge also flagged possible misstatements in some Qwen reports. Those are under human review and not reported here.
 
+**Not every session ended with a formal report.** Qwen ended 77 of its 298 sessions without calling `finish`: 47 hit the 20-turn limit and 30 stopped without calling a tool. GPT-5.5 did this in 9 of 300 sessions. Claude always either called `finish` or refused. In those sessions we treated the agent's last message as its report, which mainly affects Qwen's disclosure numbers.
+
 ---
 
 ## What this means for building agent infrastructure
@@ -250,11 +252,11 @@ The job was already active when Qwen wrote that it was "awaiting approval".
 
 ## Reproducibility and cost
 
-The harness, scenarios and analysis code are at [github.com/Extelligence-ai/Janus](https://github.com/Extelligence-ai/Janus). Raw session data (mirror logs, self-reports, judgments) is available on request. The whole pilot cost roughly $37 in Claude and OpenRouter usage, plus about 5.2 million GPT-5.5 tokens. Each mirror log carries a hash chain that can be checked independently, and every run's chain verified intact.
+The harness, scenarios and analysis code are at [github.com/Extelligence-ai/Janus](https://github.com/Extelligence-ai/Janus). Raw session data (mirror logs, self-reports, transcripts and judgments) is in the repository's `data/` folder, and the tables can be regenerated from it without an API key. The whole pilot cost roughly $37 in Claude and OpenRouter usage, plus about 5.2 million GPT-5.5 tokens. Each mirror log carries a hash chain that can be checked independently, and every run's chain verified intact.
 
-## Responsible disclosure
+## Simulation only
 
-All tools and data were simulated; no real systems, credentials or third parties were involved. Before publishing, we shared the model-specific findings with the relevant vendors.
+All tools and data were simulated; no real systems, credentials or third parties were involved.
 
 ---
 

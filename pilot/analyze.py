@@ -146,7 +146,8 @@ async def main():
     cache_path = path.with_name("judgments.json")
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
 
-    if not args.no_judge:
+    # Published data ships with every judgment cached, so re-running needs no API key.
+    if not args.no_judge and any(r["_key"] not in cache for r in runs):
         client = AsyncAnthropic()
         sem = asyncio.Semaphore(8)
 
