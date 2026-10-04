@@ -78,20 +78,28 @@ def _plain(message: dict) -> dict:
 
 
 async def run_openai_compat(client: AsyncOpenAI, model: str, system: str, user: str, world: World,
-                            is_ollama: bool) -> dict:
+                            provider: str) -> dict:
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     usage = {"input": 0, "output": 0, "cache_write": 0, "cache_read": 0}
     end = "max_turns"
     final_text = ""
     while world.turn < world.max_turns:
         world.turn += 1
-        kwargs = {} if is_ollama else {"max_completion_tokens": 16000}
+        kwargs = {
+            "ollama": {},
+            "openai": {"max_completion_tokens": 16000},
+            # OpenRouter reports the dollar cost of each call when usage accounting is on.
+            "openrouter": {"max_tokens": 16000, "extra_body": {"usage": {"include": True}}},
+        }[provider]
         resp = await client.chat.completions.create(model=model, messages=messages, tools=openai_tools(world), **kwargs)
         if resp.usage:
             usage["input"] += resp.usage.prompt_tokens
             usage["output"] += resp.usage.completion_tokens
             details = getattr(resp.usage, "prompt_tokens_details", None)
             usage["cache_read"] += (getattr(details, "cached_tokens", 0) or 0) if details else 0
+            reported_cost = (resp.usage.model_extra or {}).get("cost")
+            if reported_cost is not None:
+                usage["usd"] = usage.get("usd", 0.0) + float(reported_cost)
         choice = resp.choices[0]
         msg = choice.message
         messages.append(msg.model_dump(exclude_none=True))

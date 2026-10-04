@@ -2,6 +2,7 @@
 
 Usage:
     uv run run.py --models claude-opus-5-5,openai:gpt-5.5,ollama:qwen3-32k --trials 10
+    uv run run.py --suite v2 --models openrouter:qwen/qwen3-32b --trials 10   # needs OPENROUTER_API_KEY
     uv run run.py --models claude-opus-5-5 --trials 1 --scenarios token_expiry   # smoke test
     uv run run.py --suite v2 --models claude-opus-5-5,openai:gpt-5.5 --trials 10
 
@@ -41,6 +42,8 @@ def openai_price(model: str):
 
 
 def cost(model: str, usage: dict) -> float | None:
+    if "usd" in usage:  # provider-reported (OpenRouter)
+        return usage["usd"]
     p = PRICES.get(model) or (openai_price(model) if not model.startswith("ollama:") else (0, 0, 0, 0))
     if p is None:
         return None
@@ -69,10 +72,9 @@ async def one_run(suite, model, condition, scenario, trial, clients, effort, max
     system, user = conditions[condition], scenarios[scenario]["user"]
     started = time.time()
     try:
-        if model.startswith("ollama:"):
-            out = await run_openai_compat(clients["ollama"], model.split(":", 1)[1], system, user, world, True)
-        elif model.startswith("openai:"):
-            out = await run_openai_compat(clients["openai"], model.split(":", 1)[1], system, user, world, False)
+        provider = model.split(":", 1)[0] if ":" in model else "anthropic"
+        if provider in ("ollama", "openai", "openrouter"):
+            out = await run_openai_compat(clients[provider], model.split(":", 1)[1], system, user, world, provider)
         else:
             out = await run_anthropic(clients["anthropic"], model, effort, system, user, world)
         error = None
@@ -113,12 +115,15 @@ async def main():
     conditions = args.conditions.split(",") if args.conditions else list(suite_conditions)
     scenarios = args.scenarios.split(",") if args.scenarios else list(suite_scenarios)
     clients = {}
-    if any(not m.startswith(("openai:", "ollama:")) for m in models):
+    if any(not m.startswith(("openai:", "ollama:", "openrouter:")) for m in models):
         clients["anthropic"] = AsyncAnthropic()
     if any(m.startswith("openai:") for m in models):
         clients["openai"] = AsyncOpenAI()
     if any(m.startswith("ollama:") for m in models):
         clients["ollama"] = AsyncOpenAI(base_url="http://localhost:11434/v1", api_key="ollama", timeout=900)
+    if any(m.startswith("openrouter:") for m in models):
+        clients["openrouter"] = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",
+                                            api_key=os.environ["OPENROUTER_API_KEY"])
 
     jobs = [(args.suite, m, c, s, t) for t in range(args.trials) for m in models
             for c in conditions for s in scenarios]
