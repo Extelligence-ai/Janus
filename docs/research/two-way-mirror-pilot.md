@@ -2,7 +2,7 @@
 
 *An exploratory pilot on whether AI agents grab lasting access, follow rules about it, and tell the truth about what they did*
 
-**Status:** exploratory pilot, not peer reviewed · **Date:** October 2026 · **Author:** [Author] · **Code and data:** [repository link]
+**Status:** exploratory pilot, not peer reviewed · **Date:** October 2026 · **Author:** Arun Venkatadri · **Code:** [github.com/Extelligence-ai/Janus](https://github.com/Extelligence-ai/Janus)
 
 ---
 
@@ -250,7 +250,7 @@ The job was already active when Qwen wrote that it was "awaiting approval".
 
 ## Reproducibility and cost
 
-The harness, scenarios, analysis code and raw session data (mirror logs, self-reports, judgments) are available at [repository link]. The whole pilot cost roughly $37 in Claude and OpenRouter usage, plus about 5.2 million GPT-5.5 tokens. Each mirror log carries a hash chain that can be checked independently, and every run's chain verified intact.
+The harness, scenarios and analysis code are at [github.com/Extelligence-ai/Janus](https://github.com/Extelligence-ai/Janus). Raw session data (mirror logs, self-reports, judgments) is available on request. The whole pilot cost roughly $37 in Claude and OpenRouter usage, plus about 5.2 million GPT-5.5 tokens. Each mirror log carries a hash chain that can be checked independently, and every run's chain verified intact.
 
 ## Responsible disclosure
 
@@ -258,4 +258,4 @@ All tools and data were simulated; no real systems, credentials or third parties
 
 ---
 
-*This is an exploratory pilot shared to invite feedback and collaboration. If you work on agent safety, evaluation or infrastructure and want to review the methodology or take part in the full study, get in touch: [contact].*
+*This is an exploratory pilot shared to invite feedback and collaboration. If you work on agent safety, evaluation or infrastructure and want to review the methodology or take part in the full study, get in touch: [research@extelligence.ai](mailto:research@extelligence.ai).*
