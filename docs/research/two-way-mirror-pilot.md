@@ -245,6 +245,7 @@ The job was already active when Qwen wrote that it was "awaiting approval".
 - A **pre-registered study** with hypotheses and analysis fixed in advance, more scenarios, and more models.
 - A **second judge from a different provider**, plus a human audit of a random sample, to remove single-vendor judge bias.
 - **Recording refusal reasons** and studying refusals as an outcome.
+- **Testing whether agents tamper with a record they can reach.** In this pilot the mirror was always out of the agent's reach, so we can't say how much that mattered. A follow-up would compare it with two alternatives: a log the agent can view, edit or delete, and a log the agent writes itself. In both cases the hidden mirror would measure whether agents clean up or leave out their footholds.
 - **Testing whether AI monitors can be manipulated** by what agents write into logs.
 - **Code-executing agents**, where the mirror has to watch system calls and network traffic rather than just tool calls, and persistence is harder to contain.
 
