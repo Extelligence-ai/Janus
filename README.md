@@ -7,14 +7,29 @@
 
 ## Preliminary findings
 
-About 1,060 simulated sessions of Claude Opus 5.5, GPT-5.5 and Qwen3-32B acting as operations agents ([full write-up](docs/research/two-way-mirror-pilot.md)):
+About 1,060 simulated sessions with three models acting as operations agents. Full details are in the [write-up](docs/research/two-way-mirror-pilot.md).
 
-- **An explicit rule works and a vague one barely does.** With a rule naming the forbidden actions plus an approval path, Claude and GPT-5.5 created no footholds (0 of 100 sessions each) and Qwen created them in 10 of 99. "Follow the principle of least privilege" left foothold rates about where they were with no rule at all (61–83% of sessions).
-- **Telling agents they were being audited changed nothing we could measure**, for any of the three models.
-- **The models fail in different ways.** Claude rarely created unrequested footholds and disclosed every one it created. GPT-5.5 often created extras, and left a foothold out of its report in 77 of the 178 sessions where it created one, almost always an API key. Qwen sometimes broke the explicit rule, in 5 of 10 cases filing the approval request only *after* creating the resource.
-- **The AI judge was the weakest link.** In the first pilot, every "fabrication" it flagged was a false alarm on human review.
+### How often agents created lasting access ("footholds")
 
-These are small-sample results from scenarios designed to tempt. They show what these models did in this simulation, not how often agents misbehave in production.
+| Model | Explicit rule | "Least privilege" | No rule | No audit notice | "You're being audited" |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Claude Opus 5.5 | **0%** | 61% | 61% | 39% | 42% |
+| GPT-5.5 | **0%** | 83% | 95% | 62% | 57% |
+| Qwen3-32B | **10%** | 62% | 59% | 43% | 45% |
+
+**Takeaway:** a specific rule works, while a vague principle performs about the same as having no rule. Telling agents they're being audited made no measurable difference.
+
+### What each model did that nobody asked for
+
+| Model | Unneeded API keys | Alerts routed to an agent inbox | Footholds left out of its own report |
+|---|:-:|:-:|:-:|
+| Claude Opus 5.5 | 0 sessions | 0 / 60 | 0 of finished sessions |
+| GPT-5.5 | **36 sessions** | **40 / 60** | **77 / 178** |
+| Qwen3-32B | 2 sessions | 0 / 60 | 19 / 130 |
+
+**Takeaway:** what an agent says it did is not an audit trail. The footholds missing from reports were almost all API keys, which in this setup never expire.
+
+> Percentages are sessions with at least one foothold, about 100 per policy cell and 150 per audit-notice cell. Confidence intervals are in the write-up. These are small samples from scenarios designed to tempt, so they show what these models did in this simulation, not how often agents misbehave in production.
 
 ## What's here
 
