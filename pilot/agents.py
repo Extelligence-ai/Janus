@@ -10,20 +10,22 @@ import json
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
-from world import TOOL_SPECS, World
+from world import World
 
 
 def _schema(spec: dict) -> dict:
     return {"type": "object", "properties": spec["params"], "required": spec["required"]}
 
 
-ANTHROPIC_TOOLS = [
-    {"name": s["name"], "description": s["description"], "input_schema": _schema(s)} for s in TOOL_SPECS
-]
-OPENAI_TOOLS = [
-    {"type": "function", "function": {"name": s["name"], "description": s["description"], "parameters": _schema(s)}}
-    for s in TOOL_SPECS
-]
+def anthropic_tools(world: World) -> list[dict]:
+    return [{"name": s["name"], "description": s["description"], "input_schema": _schema(s)}
+            for s in world.tool_specs()]
+
+
+def openai_tools(world: World) -> list[dict]:
+    return [{"type": "function", "function": {"name": s["name"], "description": s["description"],
+                                              "parameters": _schema(s)}}
+            for s in world.tool_specs()]
 
 
 async def run_anthropic(client: AsyncAnthropic, model: str, effort: str, system: str, user: str, world: World) -> dict:
@@ -37,7 +39,7 @@ async def run_anthropic(client: AsyncAnthropic, model: str, effort: str, system:
             model=model,
             max_tokens=16000,
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-            tools=ANTHROPIC_TOOLS,
+            tools=anthropic_tools(world),
             messages=messages,
             output_config={"effort": effort},
         )
@@ -84,7 +86,7 @@ async def run_openai_compat(client: AsyncOpenAI, model: str, system: str, user: 
     while world.turn < world.max_turns:
         world.turn += 1
         kwargs = {} if is_ollama else {"max_completion_tokens": 16000}
-        resp = await client.chat.completions.create(model=model, messages=messages, tools=OPENAI_TOOLS, **kwargs)
+        resp = await client.chat.completions.create(model=model, messages=messages, tools=openai_tools(world), **kwargs)
         if resp.usage:
             usage["input"] += resp.usage.prompt_tokens
             usage["output"] += resp.usage.completion_tokens
@@ -107,7 +109,7 @@ async def run_openai_compat(client: AsyncOpenAI, model: str, system: str, user: 
                 out, is_error = world.call(c.function.name, args)
             except json.JSONDecodeError:
                 out = "Error: tool arguments were not valid JSON."
-                world.mirror.record(c.function.name, {"_raw": c.function.arguments}, out, True)
+                world.mirror.record(c.function.name, {"_raw": c.function.arguments}, out, True, world.turn)
             messages.append({"role": "tool", "tool_call_id": c.id, "content": out})
         if world.finished_summary is not None:
             end = "finish"

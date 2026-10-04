@@ -3,6 +3,7 @@
 Usage:
     uv run run.py --models claude-opus-5-5,openai:gpt-5.5,ollama:qwen3-32k --trials 10
     uv run run.py --models claude-opus-5-5 --trials 1 --scenarios token_expiry   # smoke test
+    uv run run.py --suite v2 --models claude-opus-5-5,openai:gpt-5.5 --trials 10
 
 Each run is written as one JSON line to results/<stamp>/runs.jsonl, including the
 mirror log, so analysis never depends on what the agent said about itself.
@@ -20,7 +21,7 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from agents import run_anthropic, run_openai_compat
-from scenarios import CONDITIONS, SCENARIOS
+from scenarios import SUITES
 from world import World
 
 # $ per million tokens: (input, output, cache_write, cache_read). Anthropic rates as of 2026-09-25.
@@ -62,9 +63,10 @@ class Budget:
         return self.spent >= self.dollars or self.tokens >= self.unpriced_tokens
 
 
-async def one_run(model, condition, scenario, trial, clients, effort, max_turns):
-    world = World(SCENARIOS[scenario], max_turns)
-    system, user = CONDITIONS[condition], SCENARIOS[scenario]["user"]
+async def one_run(suite, model, condition, scenario, trial, clients, effort, max_turns):
+    conditions, scenarios = SUITES[suite]
+    world = World(scenarios[scenario], max_turns)
+    system, user = conditions[condition], scenarios[scenario]["user"]
     started = time.time()
     try:
         if model.startswith("ollama:"):
@@ -80,6 +82,7 @@ async def one_run(model, condition, scenario, trial, clients, effort, max_turns)
         error = f"{type(e).__name__}: {e}"
     price_key = model.split(":", 1)[1] if model.startswith("openai:") else model
     return {
+        "suite": suite, "system": system, "user": user,
         "model": model, "condition": condition, "scenario": scenario, "trial": trial,
         "end": out["end"], "error": error, "turns": world.turn, "seconds": round(time.time() - started, 1),
         "usage": out["usage"], "cost": cost(price_key, out["usage"]),
@@ -94,9 +97,10 @@ async def main():
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", required=True)
+    ap.add_argument("--suite", default="v1", choices=sorted(SUITES))
     ap.add_argument("--trials", type=int, default=10)
-    ap.add_argument("--scenarios", default=",".join(SCENARIOS))
-    ap.add_argument("--conditions", default=",".join(CONDITIONS))
+    ap.add_argument("--scenarios", help="comma-separated; default: all in suite")
+    ap.add_argument("--conditions", help="comma-separated; default: all in suite")
     ap.add_argument("--budget", type=float, default=50.0, help="hard $ cap across priced models")
     ap.add_argument("--unpriced-token-cap", type=int, default=10_000_000)
     ap.add_argument("--effort", default="medium", help="Claude effort level")
@@ -105,6 +109,9 @@ async def main():
     args = ap.parse_args()
 
     models = args.models.split(",")
+    suite_conditions, suite_scenarios = SUITES[args.suite]
+    conditions = args.conditions.split(",") if args.conditions else list(suite_conditions)
+    scenarios = args.scenarios.split(",") if args.scenarios else list(suite_scenarios)
     clients = {}
     if any(not m.startswith(("openai:", "ollama:")) for m in models):
         clients["anthropic"] = AsyncAnthropic()
@@ -113,8 +120,8 @@ async def main():
     if any(m.startswith("ollama:") for m in models):
         clients["ollama"] = AsyncOpenAI(base_url="http://localhost:11434/v1", api_key="ollama", timeout=900)
 
-    jobs = [(m, c, s, t) for t in range(args.trials) for m in models
-            for c in args.conditions.split(",") for s in args.scenarios.split(",")]
+    jobs = [(args.suite, m, c, s, t) for t in range(args.trials) for m in models
+            for c in conditions for s in scenarios]
     out_dir = Path(__file__).resolve().parent / "results" / time.strftime("%Y%m%d-%H%M%S")
     out_dir.mkdir(parents=True)
     out_file = (out_dir / "runs.jsonl").open("w")
@@ -125,7 +132,7 @@ async def main():
 
     async def worker(job):
         nonlocal done
-        sem = local if job[0].startswith("ollama:") else remote
+        sem = local if job[1].startswith("ollama:") else remote
         async with sem:
             if budget.exhausted():
                 return
@@ -134,9 +141,8 @@ async def main():
             out_file.write(json.dumps(rec, default=str) + "\n")
             out_file.flush()
             done += 1
-            footholds = sum(1 for e in rec["mirror"] if e["tool"] in
-                            {"create_api_key", "create_webhook", "schedule_job", "write_memory"})
-            print(f"[{done}/{len(jobs)}] {rec['model']:<22} {rec['condition']:<8} {rec['scenario']:<17} "
+            footholds = sum(1 for e in rec["mirror"] if e["foothold"])
+            print(f"[{done}/{len(jobs)}] {rec['model']:<22} {rec['condition']:<17} {rec['scenario']:<17} "
                   f"end={rec['end']:<12} footholds={footholds} cost=${rec['cost'] or 0:.3f} "
                   f"total=${budget.spent:.2f}{' ERR ' + rec['error'] if rec['error'] else ''}", flush=True)
 
