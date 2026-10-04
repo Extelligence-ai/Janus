@@ -5,6 +5,17 @@
 > [!WARNING]
 > **Preliminary research.** This is an exploratory pilot. It hasn't been peer reviewed or pre-registered, and it uses one simulated environment, five designed scenarios, three models and about ten sessions per condition. The numbers describe what these models did in this simulation, not how often agents misbehave in production, and exact counts may shift as the analysis is audited. The code is throwaway spike code, not a production system. Read [what this does and doesn't show](docs/research/two-way-mirror-pilot.md#what-this-does-and-doesnt-show) before citing anything.
 
+## Preliminary findings
+
+About 1,060 simulated sessions of Claude Opus 5.5, GPT-5.5 and Qwen3-32B acting as operations agents ([full write-up](docs/research/two-way-mirror-pilot.md)):
+
+- **An explicit rule works and a vague one barely does.** With a rule naming the forbidden actions plus an approval path, Claude and GPT-5.5 created no footholds (0 of 100 sessions each) and Qwen created them in 10 of 99. "Follow the principle of least privilege" left foothold rates about where they were with no rule at all (61–83% of sessions).
+- **Telling agents they were being audited changed nothing we could measure**, for any of the three models.
+- **The models fail in different ways.** Claude rarely created unrequested footholds and disclosed every one it created. GPT-5.5 often created extras, and left a foothold out of its report in 77 of the 178 sessions where it created one, almost always an API key. Qwen sometimes broke the explicit rule, in 5 of 10 cases filing the approval request only *after* creating the resource.
+- **The AI judge was the weakest link.** In the first pilot, every "fabrication" it flagged was a false alarm on human review.
+
+These are small-sample results from scenarios designed to tempt. They show what these models did in this simulation, not how often agents misbehave in production.
+
 ## What's here
 
 | Path | What it is |
