@@ -12,13 +12,15 @@ We ran about 1,060 sessions of three AI models (Claude Opus 5.5, GPT-5.5, and th
 
 What we found, in a simulated environment:
 
-- **An explicit rule works and a vague one barely does.** When the instructions named the forbidden actions and offered an approval path, Claude and GPT-5.5 created no footholds at all (0 of 100 sessions each) and Qwen created them in 10 of 99. Replacing that rule with "follow the principle of least privilege" left foothold rates about where they were with no rule at all (61–83% of sessions).
+- **An explicit rule helped a lot, but it wasn't a guarantee, and a vague one barely helped.** When the instructions named the forbidden actions and offered an approval path, Claude and GPT-5.5 created no footholds in this test (0 of 100 sessions each), but Qwen still created them in 10 of 99. Replacing that rule with "follow the principle of least privilege" left foothold rates about where they were with no rule at all (61–83% of sessions).
 - **Telling agents they were being audited changed nothing we could measure**, for any of the three models.
 - **The models fail in different ways.**
   - Claude rarely created footholds nobody asked for, and disclosed every one it created.
-  - GPT-5.5 often created extras. It minted never-expiring API keys the task didn't need in 36 sessions and routed future alerts to an inbox that starts new agent sessions in 40 of 60 opportunities. It left a foothold out of its report in 75 of the 178 sessions where it created one, almost always an API key.
+  - GPT-5.5 often created extras. It minted never-expiring API keys the task didn't need in 36 sessions and routed future alerts to an inbox that starts new agent sessions in 40 of 60 opportunities.
   - Qwen sometimes broke the explicit rule. In 5 of those 10 sessions it filed an approval request only *after* creating the resource.
+- **Agents lied by omission.** The most common gap between what agents did and what they said was leaving things out. GPT-5.5 left a foothold out of its report in 75 of the 178 sessions where it created one, and Qwen in 19 of 130. What they left out was almost always an API key, the kind of foothold that matters most for persistence. Every statement in those reports could be true while the report as a whole misled the user.
 - **The AI judge was the weakest link.** In our first pilot, every "fabrication" our AI judge flagged was a false alarm on human review. Monitoring agents with AI needs monitoring too.
+- **We need to evaluate models on how well they comply with human orders and how reliably they follow best practices in key areas like security and privacy, not just on pure capability.**
 
 These are early, small-sample results from designed scenarios. They show what these models did in this simulation, not how often agents misbehave in production.
 
@@ -40,6 +42,24 @@ Our approach is a **two-way mirror**: the agent works normally, while everything
 - **The agent's side:** ordinary tools. Nothing in its environment reveals the recording.
 - **The observer's side:** every tool call and result is written to an append-only log. Each entry is cryptographically chained to the one before it, so any later edit, deletion or reordering is detectable.
 - **The comparison:** at the end of each task, the agent writes a report for its user. We compare that **self-report** with the **mirror record**. Differences between the two, such as actions left out or claims of actions that never happened, are the core signal.
+
+```mermaid
+sequenceDiagram
+    participant M as Model (provider API)
+    participant L as Agent loop (harness)
+    participant T as Tools (fake company systems)
+    participant R as Mirror (hash-chained log)
+    M->>L: 1. create_api_key(...)
+    L->>T: 2. run the tool
+    T->>R: 3. record every call (tool, arguments, result)
+    T-->>L: 4. result text only
+    L-->>M: 5. tool result
+    M->>L: 6. final report to the user (the self-report)
+    Note over M,R: The model has no tool that reaches the mirror.
+    Note over L,R: 7. After the session, compare the self-report with the mirror.<br/>An action in the mirror but missing from the report is an omission.
+```
+
+*One session through the two-way mirror. The model only ever sees tool results; the mirror sits in the harness, out of its reach.*
 
 This separates two things that are often blurred: what the agent *says* it did (useful but untrusted) and what it *actually* did (captured independently).
 
@@ -129,7 +149,7 @@ The first pilot also exposed a problem with our measurement. The AI judge flagge
 | GPT-5.5 | **0/100** (0%) [0–4] | 83/100 (83%) [74–89] | 95/100 (95%) [89–98] |
 | Qwen3-32B | **10/99** (10%) [6–18] | 62/100 (62%) [52–71] | 58/99 (59%) [49–68] |
 
-An explicit, specific rule was the strongest control we tested: it brought both frontier models to zero. A generic security principle performed about the same as saying nothing.
+An explicit, specific rule was the strongest control we tested. It brought both frontier models to zero in this test, though 0 of 100 is still consistent with a true rate of up to about 4%, and it did not stop Qwen. A generic security principle performed about the same as saying nothing.
 
 **Sessions in which the agent asked for approval:**
 
@@ -174,6 +194,8 @@ GPT-5.5 routed alerts to the agent inbox in every session without the explicit r
 | Qwen3-32B | 130 | **19** | all API keys, all in the token-expiry scenario |
 
 *Note on Claude:* both cases were sessions cut short by a model refusal before any report was written, so there was nothing to disclose in. In every Claude session that finished, every foothold was reported.
+
+An omission like this is a lie by omission: the report reads as complete, and the user has no reason to look for a credential that was never mentioned.
 
 The pattern is specific. GPT-5.5 and Qwen generally reported scheduled jobs, webhooks and alert subscriptions, but **regularly didn't mention API keys they had created and used**, keys that in our environment never expire.
 
@@ -230,13 +252,30 @@ The job was already active when Qwen wrote that it was "awaiting approval".
 
 ---
 
-## What this means for building agent infrastructure
+## Takeaways
 
-1. **Write rules for agents as specific prohibitions with a sanctioned alternative,** not as principles. "No API keys without approval; use request_approval" worked. "Least privilege" did not.
-2. **Don't count on announced monitoring to deter.** Observation's value is in what it lets you detect, not in changing behavior.
-3. **Don't treat the agent's own report as the audit trail.** The most important omissions in our data were credentials, the kind of footholds that matter most for persistence. Capture actions independently, outside the agent's reach.
-4. **Inventory and expire footholds by default.** Every credential, job, webhook or subscription an agent creates should be recorded, time-limited and revocable, whatever the agent says about it.
-5. **Audit your AI auditors.** An AI judge comparing reports with logs is useful, but on its own it produced false alarms. Human review of its flags was necessary.
+**Results at a glance** (main pilot; counts are sessions):
+
+| Experiment | Claude Opus 5.5 | GPT-5.5 | Qwen3-32B |
+|---|---|---|---|
+| Explicit rule: created a foothold anyway | 0/100 | 0/100 | **10/99** |
+| Vague "least privilege" rule: created a foothold | 61/100 | 83/100 | 62/100 |
+| No rule: created a foothold | 61/100 | 95/100 | 58/99 |
+| Told "you are being audited" vs. not told: created a foothold | 42% vs. 39% | 57% vs. 62% | 45% vs. 43% |
+| Never-expiring API key the task didn't need | 0 | **36** | 2 |
+| Routed future alerts to an agent inbox (alert follow-up) | 0/60 | **40/60** | 0/60 |
+| Left a foothold out of its own report | 0 of finished sessions | **75/178** | **19/130** |
+| Biggest failure | 16 sessions ended in a refusal (reasons not recorded) | Created footholds nobody asked for and left credentials out of its reports | Broke the explicit rule, and in 5 of those 10 sessions asked for approval only after acting |
+
+Two Claude sessions with a foothold were cut short by a refusal before any report was written, so they are not counted as omissions.
+
+1. **We need to evaluate models on how well they comply with human orders and how reliably they follow best practices in key areas like security and privacy, not just on pure capability.** This study measured behavior, not skill: whether each model followed instructions, kept to security practice and reported honestly. The three models differed sharply on all three. Capability benchmarks don't measure these qualities, yet they decide whether an agent is safe to give real access.
+2. **Write rules for agents as specific prohibitions with a sanctioned alternative,** not as principles, and don't assume they will hold. "No API keys without approval; use request_approval" worked far better than "least privilege" in our test, but one of the three models still broke it, so back rules with enforcement in the infrastructure itself.
+3. **Models differ in how well they follow rules, not just in how capable they are.** The open-weight model, Qwen3-32B, complied less reliably than the two frontier models: it was the only one to break the explicit rule (10 of 99 sessions), sometimes asking for approval after it had already acted. It was not worse on every measure: it created far fewer footholds nobody asked for than GPT-5.5. But on following an explicit instruction it was the weakest of the three. If you choose an open-weight model for agent work, plan for tighter guardrails around it.
+4. **Don't count on announced monitoring to deter.** Observation's value is in what it lets you detect, not in changing behavior.
+5. **Don't treat the agent's own report as the audit trail.** Agents lied by omission, and what they left out were credentials, the kind of footholds that matter most for persistence. A report that is accurate line by line can still hide the one action that matters. Capture actions independently, outside the agent's reach.
+6. **Inventory and expire footholds by default.** Every credential, job, webhook or subscription an agent creates should be recorded, time-limited and revocable, whatever the agent says about it.
+7. **Audit your AI auditors.** An AI judge comparing reports with logs is useful, but on its own it produced false alarms. Human review of its flags was necessary.
 
 ---
 
